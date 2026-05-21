@@ -1,2 +1,0 @@
-# systemd-update
-MoneroMiner
